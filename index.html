@@ -311,6 +311,17 @@
         <div class="field"><label>Description (optional)</label><input type="text" id="new-desc" placeholder="Short note about this task"></div>
         <button class="add-btn" onclick="addTask()">Add task</button>
       </div>
+
+      <div class="add-section" style="margin-top:12px">
+        <div class="add-title">API Key</div>
+        <div id="api-key-status" style="font-size:13px;color:var(--text2);margin-bottom:12px;line-height:1.5"></div>
+        <div class="field">
+          <label>Anthropic API Key</label>
+          <input type="password" id="settings-api-key" placeholder="sk-ant-..." autocomplete="off" />
+        </div>
+        <button class="add-btn" onclick="saveSettingsApiKey()">Save API key</button>
+        <button onclick="clearApiKey()" style="width:100%;margin-top:8px;padding:12px;background:none;border:1px solid var(--border);border-radius:14px;font-size:14px;color:var(--text3);cursor:pointer;font-family:'DM Sans',sans-serif;">Remove API key</button>
+      </div>
     </div>
   </div>
 
@@ -422,6 +433,7 @@ function loadData() {
     showOnboarding(1);
   } else {
     render();
+    updateApiKeyStatus();
   }
 }
 
@@ -588,18 +600,42 @@ function renderToday() {
 function renderRoutine() {
   const sorted = allTasks();
   const rl = document.getElementById('routine-list');
-  if (!sorted.length) { rl.innerHTML = '<div style="padding:1rem 0;color:var(--text3);font-size:14px">No tasks yet.</div>'; return; }
-  rl.innerHTML = sorted.map(t => `
-    <div class="routine-card">
-      <div class="routine-top">
-        <span class="routine-name">${t.name}</span>
-        ${badgeHTML(t.cat)}
-        <button class="del-btn" onclick="deleteTask(${t.id})">
-          <svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
-        </button>
-      </div>
-      <div class="routine-meta">${fmt12(t.time)} · ${t.desc || ''}</div>
-    </div>`).join('');
+  if (!sorted.length) { rl.innerHTML = '<div style="padding:1rem 0;color:var(--text3);font-size:14px">No tasks yet.</div>'; }
+  else {
+    rl.innerHTML = sorted.map(t => `
+      <div class="routine-card">
+        <div class="routine-top">
+          <span class="routine-name">${t.name}</span>
+          ${badgeHTML(t.cat)}
+          <button class="del-btn" onclick="deleteTask(${t.id})">
+            <svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
+          </button>
+        </div>
+        <div class="routine-meta">${fmt12(t.time)} · ${t.desc || ''}</div>
+      </div>`).join('');
+  }
+  updateApiKeyStatus();
+}
+
+function saveSettingsApiKey() {
+  const input = document.getElementById('settings-api-key');
+  const key = input.value.trim();
+  if (!key) { showToast('Please paste your API key'); return; }
+  if (!key.startsWith('sk-ant-')) { showToast('Key must start with sk-ant-'); input.style.borderColor = '#e53e3e'; return; }
+  apiKey = key;
+  localStorage.setItem(STORAGE_API_KEY, apiKey);
+  input.value = '';
+  input.style.borderColor = '';
+  showToast('API key saved ✓');
+  updateApiKeyStatus();
+}
+
+function clearApiKey() {
+  if (!confirm('Remove your saved API key?')) return;
+  apiKey = '';
+  localStorage.removeItem(STORAGE_API_KEY);
+  showToast('API key removed');
+  updateApiKeyStatus();
 }
 
 function renderSummary() {
@@ -720,6 +756,19 @@ function switchTab(tab) {
     document.getElementById('nav-' + t).classList.toggle('active', t === tab);
   });
   render();
+  // Always update API key status when visiting routine tab
+  if (tab === 'routine') updateApiKeyStatus();
+}
+
+function updateApiKeyStatus() {
+  const statusEl = document.getElementById('api-key-status');
+  if (!statusEl) return;
+  if (apiKey) {
+    const masked = 'sk-ant-...' + apiKey.slice(-6);
+    statusEl.innerHTML = `<span style="color:var(--green)">✓ API key saved &nbsp;<span style="color:var(--text3);font-size:12px">${masked}</span></span>`;
+  } else {
+    statusEl.innerHTML = `<span style="color:#e53e3e">✗ No API key set</span> — paste yours below. Get one free at <a href="https://console.anthropic.com" target="_blank" style="color:var(--green)">console.anthropic.com</a>`;
+  }
 }
 
 function showToast(msg) {
