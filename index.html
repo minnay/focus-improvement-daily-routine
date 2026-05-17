@@ -355,17 +355,30 @@
 
   <!-- Onboarding -->
   <div class="onboarding-overlay hidden" id="onboarding">
-    <div class="onboarding-icon">
-      <svg viewBox="0 0 24 24"><path d="M12 2a7 7 0 017 7c0 5-7 13-7 13S5 14 5 9a7 7 0 017-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+    <!-- Step 1: Name -->
+    <div id="ob-step-1">
+      <div class="onboarding-icon">
+        <svg viewBox="0 0 24 24"><path d="M12 2a7 7 0 017 7c0 5-7 13-7 13S5 14 5 9a7 7 0 017-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+      </div>
+      <div class="onboarding-title">Welcome to<br>Your Daily Routine</div>
+      <div class="onboarding-sub">A personal space to build better habits, sharpen your memory, and own your day — one task at a time.</div>
+      <input class="onboarding-input" id="onboarding-name" type="text" placeholder="What's your name?" maxlength="30" autocomplete="given-name" />
+      <button class="onboarding-btn" onclick="submitName()">Continue →</button>
     </div>
-    <div class="onboarding-title">Welcome to<br>Your Daily Routine</div>
-    <div class="onboarding-sub">A personal space to build better habits, sharpen your memory, and own your day — one task at a time.</div>
-    <input class="onboarding-input" id="onboarding-name" type="text" placeholder="What's your name?" maxlength="30" autocomplete="given-name" />
-    <button class="onboarding-btn" onclick="saveName()">Let's go →</button>
+    <!-- Step 2: API Key -->
+    <div id="ob-step-2" style="display:none">
+      <div class="onboarding-icon" style="background:#1a1a1a">
+        <svg viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+      </div>
+      <div class="onboarding-title">One last thing</div>
+      <div class="onboarding-sub">The AI daily summary needs an Anthropic API key. Get one free at <strong>console.anthropic.com</strong> — it starts with <code style="font-size:13px;background:rgba(0,0,0,0.06);padding:2px 6px;border-radius:4px">sk-ant-</code></div>
+      <input class="onboarding-input" id="onboarding-key" type="password" placeholder="Paste your API key" autocomplete="off" />
+      <button class="onboarding-btn" onclick="submitApiKey()">Get started →</button>
+      <button onclick="skipApiKey()" style="background:none;border:none;color:var(--text3);font-size:13px;margin-top:14px;cursor:pointer;font-family:'DM Sans',sans-serif">Skip for now — I'll add it later</button>
+    </div>
   </div>
 
 <script>
-const API_KEY = '';
 
 const DEFAULT_TASKS = [
   { id: 1, name: "Drink a full glass of water", time: "07:00", cat: "morning", desc: "Before touching your phone — rehydrate immediately on waking" },
@@ -381,20 +394,20 @@ const DEFAULT_TASKS = [
 
 const STORAGE_TASKS = 'routine_tasks';
 const STORAGE_LOG_PREFIX = 'routine_log_';
+const STORAGE_NAME = 'routine_username';
+const STORAGE_API_KEY = 'routine_api_key';
 
 let tasks = [];
 let todayLog = {};
 let todayKey = '';
 let currentTab = 'today';
+let userName = '';
+let apiKey = '';
 
 function getTodayKey() {
   const d = new Date();
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 }
-
-const STORAGE_NAME = 'routine_username';
-
-let userName = '';
 
 function loadData() {
   todayKey = getTodayKey();
@@ -402,23 +415,62 @@ function loadData() {
   tasks = saved ? JSON.parse(saved) : JSON.parse(JSON.stringify(DEFAULT_TASKS));
   const log = localStorage.getItem(STORAGE_LOG_PREFIX + todayKey);
   todayLog = log ? JSON.parse(log) : {};
-
   userName = localStorage.getItem(STORAGE_NAME) || '';
+  apiKey = localStorage.getItem(STORAGE_API_KEY) || '';
+
   if (!userName) {
-    document.getElementById('onboarding').classList.remove('hidden');
-    const input = document.getElementById('onboarding-name');
-    input.addEventListener('keydown', e => { if (e.key === 'Enter') saveName(); });
+    showOnboarding(1);
   } else {
     render();
   }
 }
 
-function saveName() {
+function showOnboarding(step) {
+  document.getElementById('onboarding').classList.remove('hidden');
+  document.getElementById('ob-step-1').style.display = step === 1 ? 'block' : 'none';
+  document.getElementById('ob-step-2').style.display = step === 2 ? 'block' : 'none';
+  if (step === 1) {
+    const input = document.getElementById('onboarding-name');
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') submitName(); });
+    setTimeout(() => input.focus(), 100);
+  } else {
+    const input = document.getElementById('onboarding-key');
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') submitApiKey(); });
+    setTimeout(() => input.focus(), 100);
+  }
+}
+
+function submitName() {
   const input = document.getElementById('onboarding-name');
   const name = input.value.trim();
-  if (!name) { input.placeholder = 'Please enter your name'; return; }
+  if (!name) { input.placeholder = 'Please enter your name'; input.focus(); return; }
   userName = name;
   localStorage.setItem(STORAGE_NAME, userName);
+  if (!apiKey) {
+    showOnboarding(2);
+  } else {
+    document.getElementById('onboarding').classList.add('hidden');
+    render();
+  }
+}
+
+function submitApiKey() {
+  const input = document.getElementById('onboarding-key');
+  const key = input.value.trim();
+  if (!key || !key.startsWith('sk-ant-')) {
+    input.style.borderColor = '#e53e3e';
+    input.placeholder = 'Must start with sk-ant-';
+    input.value = '';
+    input.focus();
+    return;
+  }
+  apiKey = key;
+  localStorage.setItem(STORAGE_API_KEY, apiKey);
+  document.getElementById('onboarding').classList.add('hidden');
+  render();
+}
+
+function skipApiKey() {
   document.getElementById('onboarding').classList.add('hidden');
   render();
 }
@@ -610,6 +662,21 @@ function addTask() {
 async function generateSummary() {
   const btn = document.querySelector('.ai-btn');
   const out = document.getElementById('ai-output');
+
+  if (!apiKey) {
+    out.textContent = 'No API key saved. Go to Settings in the Routine tab to add your Anthropic API key.';
+    out.style.display = 'block';
+    // Prompt them to add it now
+    const key = prompt('Paste your Anthropic API key (starts with sk-ant-):');
+    if (key && key.startsWith('sk-ant-')) {
+      apiKey = key.trim();
+      localStorage.setItem(STORAGE_API_KEY, apiKey);
+      out.style.display = 'none';
+    } else {
+      return;
+    }
+  }
+
   btn.textContent = 'Generating…';
   btn.disabled = true;
   out.style.display = 'none';
@@ -630,7 +697,7 @@ Write a short personal end-of-day summary in 3–4 paragraphs. Address ${userNam
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
       body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 1000, messages: [{ role: 'user', content: prompt }] })
     });
     const data = await res.json();
